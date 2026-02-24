@@ -155,35 +155,35 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <EnableManagedIncrementalBuild>true</EnableManagedIncrementalBuild>
     <OutDir>..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_NoPthread|x64'">
     <EnableManagedIncrementalBuild>true</EnableManagedIncrementalBuild>
     <OutDir>..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugNoPThreadWithBullet|x64'">
     <EnableManagedIncrementalBuild>true</EnableManagedIncrementalBuild>
     <OutDir>..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <EnableManagedIncrementalBuild>true</EnableManagedIncrementalBuild>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <OutDir>..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_NoPthread|x64'">
     <EnableManagedIncrementalBuild>true</EnableManagedIncrementalBuild>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <OutDir>..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_NO_PTHREAD_WITH_BULLET|x64'">
     <EnableManagedIncrementalBuild>true</EnableManagedIncrementalBuild>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <OutDir>..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Emscripten'">
     <IntDir>..\..\..\Intermedia\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>

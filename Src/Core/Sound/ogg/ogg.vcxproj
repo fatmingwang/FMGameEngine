@@ -125,23 +125,23 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>..\..\..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_NoPthread|x64'">
     <OutDir>..\..\..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>..\..\..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_NoPthread|x64'">
     <OutDir>..\..\..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_NO_PTHREAD_WITH_BULLET|x64'">
     <OutDir>..\..\..\..\lib\$(Configuration)\</OutDir>
-    <IntDir>..\..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir>..\..\..\..\Intermedia\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Emscripten'">
     <IntDir>..\..\..\..\..\Intermedia\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
