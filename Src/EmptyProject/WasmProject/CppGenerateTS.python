@@ -1,0 +1,27 @@
+import re
+
+# Read WasmProject.cpp
+with open('WasmProject.cpp', 'r') as f:
+    cpp_content = f.read()
+
+# Find functions with EMSCRIPTEN_KEEPALIVE
+function_pattern = r'EMSCRIPTEN_KEEPALIVE\s+int\s+(\w+)\s*\(([^)]*)\)\s*{'
+functions = re.findall(function_pattern, cpp_content)
+
+# Generate WasmProject.d.ts
+ts_content = '''interface EmscriptenModule {
+'''
+for func_name, params in functions:
+    param_names = [p.strip().split()[-1] for p in params.split(',') if p.strip()]
+    ts_params = ', '.join(f'{name}: number' for name in param_names)
+    ts_content += f'  {func_name}: ({ts_params}) => number;\n'
+ts_content += '''}
+
+declare module 'WasmProject.js';
+'''
+
+# Write to WasmProject.d.ts
+with open('WasmProject.d.ts', 'w') as f:
+    f.write(ts_content)
+
+print('Generated WasmProject.d.ts')

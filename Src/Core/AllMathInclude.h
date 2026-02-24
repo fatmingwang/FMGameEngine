@@ -1,0 +1,12 @@
+#pragma once
+#include "Math/Vector2.h"
+#include "Math/Vector3.h"
+#include "Math/Vector4.h"
+#include "Math/Matrix33.h"
+#include "Math/Matrix44.h"
+#include "Math/Plane.h"
+#include "Math/Collision.h"
+#include "Math/Quaternion.h"
+#include "Math/MathUtility.h"
+#include "Math/Line.h"
+#include "Math/Bound.h"

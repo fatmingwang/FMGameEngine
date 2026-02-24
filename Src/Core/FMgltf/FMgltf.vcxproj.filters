@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="glTF">
+      <UniqueIdentifier>{54c82dfe-38ca-49ab-a1d0-c4f504a6198b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glTF\Shader">
+      <UniqueIdentifier>{ddcc1c60-45db-4b49-bffa-1071b31f88a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GameScene">
+      <UniqueIdentifier>{d4c65394-fe09-4f36-affe-f0718044c5e2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glTF\Animation">
+      <UniqueIdentifier>{ca378599-9c6a-4c60-a330-c08cafbaed53}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shadow">
+      <UniqueIdentifier>{a6c64dce-2e26-4776-956b-a74cf5d2de78}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IBL">
+      <UniqueIdentifier>{af0fc066-44e7-4597-be2a-3d5cc7d9b79a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFMesh.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFNode.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFMaterial.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFModel.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="tiny_gltf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LazyShaderGenerator.h">
+      <Filter>glTF\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFLight.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFCamera.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="GameScene.h">
+      <Filter>GameScene</Filter>
+    </ClInclude>
+    <ClInclude Include="Common.h">
+      <Filter>glTF</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFAnimation.h">
+      <Filter>glTF\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="glTFAnimationMesh.h">
+      <Filter>glTF\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationTexture.h">
+      <Filter>glTF\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="ShadowMap.h">
+      <Filter>Shadow</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonShader.hpp">
+      <Filter>glTF\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="IBLManager.h">
+      <Filter>IBL</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFMesh.cpp">
+      <Filter>glTF</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFNode.cpp">
+      <Filter>glTF</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFMaterial.cpp">
+      <Filter>glTF</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFModel.cpp">
+      <Filter>glTF</Filter>
+    </ClCompile>
+    <ClCompile Include="LazyShaderGenerator.cpp">
+      <Filter>glTF\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFLight.cpp">
+      <Filter>glTF</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFCamera.cpp">
+      <Filter>glTF</Filter>
+    </ClCompile>
+    <ClCompile Include="GameScene.cpp">
+      <Filter>GameScene</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneTestCode.cpp">
+      <Filter>GameScene</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFAnimation.cpp">
+      <Filter>glTF\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="glTFAnimationMesh.cpp">
+      <Filter>glTF\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="AnimationTexture.cpp">
+      <Filter>glTF\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ShadowMap.cpp">
+      <Filter>Shadow</Filter>
+    </ClCompile>
+    <ClCompile Include="IBLManager.cpp">
+      <Filter>IBL</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

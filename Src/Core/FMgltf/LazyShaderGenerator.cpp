@@ -1,0 +1,980 @@
+#include "../AllCoreInclude.h"
+#include "LazyShaderGenerator.h"
+#include "glTFAnimationMesh.h"
+#include "glTFLight.h"
+#include "glTFMaterial.h"
+#include "CommonShader.hpp"
+#include "IBLManager.h"
+#ifdef DEBUG
+std::string g_strVSForDebug;
+std::string g_strFSForDebug;
+#endif
+
+std::string GenerateShaderDefinesFromFVF(int64 e_i64FVFFlags)
+{
+    std::string l_strDefine;
+    if (e_i64FVFFlags & FVF_POS_FLAG)
+        l_strDefine += "#define USE_POSITION\n";
+    if (e_i64FVFFlags & FVF_DIFFUSE_FLAG)
+        l_strDefine += "#define USE_DIFFUSE\n";
+    if (e_i64FVFFlags & FVF_NORMAL_FLAG)
+        l_strDefine += "#define USE_NORMAL\n";
+    if (e_i64FVFFlags & FVF_TANGENT_FLAG)
+        l_strDefine += "#define USE_TANGENT\n";
+    if (e_i64FVFFlags & FVF_BINORMAL_FLAG)
+        l_strDefine += "#define USE_BINORMAL\n";
+    if (e_i64FVFFlags & FVF_SKINNING_WEIGHT_FLAG)
+        l_strDefine += "#define USE_WEIGHTS\n";
+    if (e_i64FVFFlags & FVF_SKINNING_BONE_INDEX_FLAG)
+        l_strDefine += "#define USE_JOINTS\n";
+    if (e_i64FVFFlags & FVF_TEX0_FLAG)
+        l_strDefine += "#define USE_TEXCOORD_0\n";
+    if (e_i64FVFFlags & FVF_TEX1_FLAG)
+        l_strDefine += "#define USE_TEXCOORD_1\n";
+    if (e_i64FVFFlags & FVF_INSTANCING_FLAG)
+        l_strDefine += "#define USE_INSTANCING\n";
+    if (e_i64FVFFlags & FVF_ANIMATION_TEXTURE_FLAG)
+        l_strDefine += "#define FVF_ANIMATION_TEXTURE_FLAG\n";
+    return l_strDefine;
+}
+
+std::string GenerateFragmentShaderDefines(int64 e_i64FVFFlags, sTectureAndTexCoordinateIndex* e_pTectureAndTexCoordinateIndex)
+{
+    std::string l_strDefine;
+    
+    // Basic FVF flags
+    if (e_i64FVFFlags & FVF_TEX0_FLAG)
+        l_strDefine += "#define USE_TEXCOORD_0\n";
+    if (e_i64FVFFlags & FVF_TEX1_FLAG)
+        l_strDefine += "#define USE_TEXCOORD_1\n";
+    if (e_i64FVFFlags & FVF_NORMAL_FLAG)
+        l_strDefine += "#define USE_NORMAL\n";
+    if (e_i64FVFFlags & FVF_TANGENT_FLAG)
+        l_strDefine += "#define USE_TANGENT\n";
+    if (e_i64FVFFlags & FVF_BINORMAL_FLAG)
+        l_strDefine += "#define USE_BINORMAL\n";
+    
+    // Texture flags
+    if (e_i64FVFFlags & FVF_BASE_COLOR_TEXTURE_FLAG)
+        l_strDefine += "#define FVF_BASE_COLOR_TEXTURE_FLAG\n";
+    if (e_i64FVFFlags & FVF_NORMAL_MAP_TEXTURE_FLAG)
+        l_strDefine += "#define USE_NORMAL_MAP\n";
+    if (e_i64FVFFlags & FVF_FVF_OCCLUSION_TEXTURE_FLAG)
+        l_strDefine += "#define USE_OCCLUSION\n";
+    if (e_i64FVFFlags & FVF_METALLIC_ROUGHNESS_TEXTURE_FLAG)
+        l_strDefine += "#define USE_METALLIC_ROUGHNESS\n";
+    if (e_i64FVFFlags & FVF_EMISSIVE_TEXTURE_FLAG)
+        l_strDefine += "#define USE_EMISSIVE\n";
+    
+    // Material-specific flags from texture coordinate index structure
+    if (e_pTectureAndTexCoordinateIndex)
+    {
+        if (e_pTectureAndTexCoordinateIndex->m_bUseSpecular)
+            l_strDefine += "#define USE_SPECULAR\n";
+        if (e_pTectureAndTexCoordinateIndex->m_bUsePBR)
+            l_strDefine += "#define USE_PBR\n";
+        if (e_pTectureAndTexCoordinateIndex->m_strAlphaMode == "MASK")
+            l_strDefine += "#define ALPHA_MASK\n";
+        
+        // Specular texture presence
+        if (e_pTectureAndTexCoordinateIndex->m_iSpecularTextureCoordinateIndex >= 0)
+            l_strDefine += "#define HAS_SPECULAR_TEXTURE\n";
+        if (e_pTectureAndTexCoordinateIndex->m_iSpecularColorTextureCoordinateIndex >= 0)
+            l_strDefine += "#define HAS_SPECULAR_COLOR_TEXTURE\n";
+        
+        // Auto-enable IBL for PBR materials when IBL environment is available
+        // IBL is a scene-level feature, not stored in glTF files
+        bool l_bUseIBL = e_pTectureAndTexCoordinateIndex->m_bUseIBL;
+        if (!l_bUseIBL && e_pTectureAndTexCoordinateIndex->m_bUsePBR)
+        {
+            // Auto-enable: If material is PBR and IBL Manager has environment loaded
+            if (g_pIBLManager && g_pIBLManager->IsIBLEnabled())
+            {
+                l_bUseIBL = true;
+            }
+        }
+        if (l_bUseIBL)
+            l_strDefine += "#define USE_IBL\n";
+    }
+    
+    l_strDefine += "#define MAX_LIGHT " + ValueToString(MAX_LIGHT);
+    
+    return l_strDefine;
+}
+
+std::string GenerateVertexShaderWithFVF(int64 e_i64FVFFlags, int e_iNumMorphTarget)
+{
+    std::string l_strDefine = GenerateShaderDefinesFromFVF(e_i64FVFFlags);
+
+    std::string shaderCode;
+#if defined(WIN32)
+    shaderCode += "#version 330 core\n";
+#else
+    shaderCode += R"(#version 300 es
+precision mediump float;
+precision highp int;
+precision highp sampler2D;
+)";
+#endif
+    shaderCode += l_strDefine;
+    shaderCode += R"(
+#ifdef USE_POSITION
+layout(location = 0) in vec3 aPosition;
+#endif
+#ifdef USE_NORMAL
+layout(location = 1) in vec3 aNormal;
+#endif
+#ifdef USE_DIFFUSE
+layout(location = 2) in vec3 aVertexColor;
+#endif
+#ifdef USE_TANGENT
+layout(location = 3) in vec3 aTangent;
+#endif
+#ifdef USE_BINORMAL
+layout(location = 4) in vec3 aBinormal;
+#endif
+#ifdef USE_WEIGHTS
+layout(location = 5) in vec4 aWeights;
+#endif
+#ifdef USE_JOINTS
+#ifdef GL_ES
+layout(location = 6) in uvec4 aJoints;
+#else
+layout(location = 6) in ivec4 aJoints;
+#endif
+#endif
+#ifdef USE_TEXCOORD_0
+layout(location = 7) in vec2 aTexCoord0;
+#endif
+#ifdef USE_TEXCOORD_1
+layout(location = 8) in vec2 aTexCoord1;
+#endif
+#ifdef USE_INSTANCING
+//layout is not allow to assign mat4 so split it to vec4
+// Per-instance matrix: locations 10,11,12,13
+layout(location = 9) in vec4 aInstanceMatrix0;
+layout(location = 10) in vec4 aInstanceMatrix1;
+layout(location = 11) in vec4 aInstanceMatrix2;
+layout(location = 12) in vec4 aInstanceMatrix3;
+#endif
+)";
+#ifdef DEBUG
+    shaderCode += R"(flat out int toFSInstanceID;)";
+#endif
+
+    if (e_iNumMorphTarget > 0)
+    {
+        for (int i = 0; i < e_iNumMorphTarget; i++)
+        {
+            shaderCode += "\nlayout(location = " + std::to_string(i + FVF_MORPHING_TARGET_POS1) + ") in vec3 aMorphTarget" + std::to_string(i) + ";";
+        }
+        shaderCode += "\nuniform float uMorphWeights[" + std::to_string(e_iNumMorphTarget) + "];";
+    }
+    shaderCode += R"(
+uniform mat4 uMat4Model;
+uniform mat4 uMat4View;
+uniform mat4 uMat4Projection;
+uniform mat4 uLightViewProj;
+
+#ifdef USE_WEIGHTS
+const int MAX_BONES = 100;
+uniform mat4 uBoneTransforms[MAX_BONES];
+#endif
+
+out vec3 oVertexPos;
+out vec4 oLightSpacePos;
+#ifdef USE_NORMAL
+out vec3 toFSVec3Normal;
+#endif
+#ifdef USE_TEXCOORD_0
+out vec2 toFSVec2TexCoord0;
+#endif
+#ifdef USE_TEXCOORD_1
+out vec2 toFSVec2TexCoord1;
+#endif
+#ifdef USE_TANGENT
+out vec3 toFSVec3Tangent;
+#endif
+#ifdef USE_BINORMAL
+out vec3 toFSVec3Binormal;
+#endif
+
+//for animation texture
+
+const int MAX_INSTANCES = )";
+    shaderCode += ValueToString((int)MAX_INSTANCES);
+    shaderCode += R"(;
+uniform sampler2D uAnimTexture;
+uniform ivec2 uCurrentAndNextFrameIndex[MAX_INSTANCES];
+uniform float uAnimationLerpTime[MAX_INSTANCES];
+uniform int uNumAnimationModel;
+uniform int uNumBones;
+uniform int uTextureSize;
+
+mat4 LerpMat4(mat4 a, mat4 b, float t)
+{
+    mat4 result;
+    for (int i = 0; i < 4; ++i)
+    {
+        result[i] = mix(a[i], b[i], t); // mix each row (vec4)
+    }
+    return result;
+}
+
+mat4 GetAnimationPoseUseTightTexture(int joint, int instance)
+{
+    int numBones = uNumBones;
+    int textureSize = uTextureSize;
+    int numRowsPerMatrix = 4;
+    int frame0 = uCurrentAndNextFrameIndex[instance].x;
+    int frame1 = uCurrentAndNextFrameIndex[instance].y;
+    float t = uAnimationLerpTime[instance];
+
+    // Compute base texel index for each frame
+    int linearIndex0 = (frame0 * numBones + joint) * numRowsPerMatrix;
+    int linearIndex1 = (frame1 * numBones + joint) * numRowsPerMatrix;
+
+
+    // Fetch 4 rows for each frame
+    mat4 mat0, mat1;
+    for (int row = 0; row < 4; ++row)
+    {
+        int idx0 = linearIndex0 + row;
+        int x0 = idx0 % textureSize;
+        int y0 = idx0 / textureSize;
+        mat0[row] = texelFetch(uAnimTexture, ivec2(x0, y0), 0);
+
+        int idx1 = linearIndex1 + row;
+        int x1 = idx1 % textureSize;
+        int y1 = idx1 / textureSize;
+        mat1[row] = texelFetch(uAnimTexture, ivec2(x1, y1), 0);
+    }
+    
+    // Linear interpolate each matrix element
+    mat4 pose = LerpMat4(mat0, mat1, t);
+    return pose;
+}
+
+void main()
+{
+    vec3 position = aPosition;
+)";
+    if (e_iNumMorphTarget > 0)
+    {
+        for (int i = 0; i < e_iNumMorphTarget; i++)
+        {
+            shaderCode += "    position += uMorphWeights[" + std::to_string(i) + "] * aMorphTarget" + std::to_string(i) + ";\n";
+        }
+    }
+
+    shaderCode += R"(
+    vec4 worldPos = vec4(position, 1.0);
+
+#ifdef USE_WEIGHTS
+#ifdef USE_JOINTS
+    mat4 skinMatrix;
+    if(uNumAnimationModel != 0)
+    {
+        int instanceIndex = gl_InstanceID % uNumAnimationModel;
+	    mat4 pose0 = GetAnimationPoseUseTightTexture(int(aJoints.x), instanceIndex);
+	    mat4 pose1 = GetAnimationPoseUseTightTexture(int(aJoints.y), instanceIndex);
+	    mat4 pose2 = GetAnimationPoseUseTightTexture(int(aJoints.z), instanceIndex);
+	    mat4 pose3 = GetAnimationPoseUseTightTexture(int(aJoints.w), instanceIndex);
+        skinMatrix = aWeights.x * pose0 +
+                          aWeights.y * pose1 +
+                          aWeights.z * pose2 +
+                          aWeights.w * pose3;
+    }
+    else
+    {
+        skinMatrix = aWeights.x * uBoneTransforms[aJoints.x] +
+                          aWeights.y * uBoneTransforms[aJoints.y] +
+                          aWeights.z * uBoneTransforms[aJoints.z] +
+                          aWeights.w * uBoneTransforms[aJoints.w];
+    }   
+    worldPos = skinMatrix * worldPos;
+#endif
+#endif
+#ifdef USE_INSTANCING
+    mat4 instanceMatrix = mat4(aInstanceMatrix0, aInstanceMatrix1, aInstanceMatrix2, aInstanceMatrix3);
+    mat3 instanceNormalMatrix = mat3(instanceMatrix);
+    worldPos = instanceMatrix * worldPos;)";
+#ifdef DEBUG
+    shaderCode += R"(
+    toFSInstanceID = gl_InstanceID;)";
+#endif
+    shaderCode += R"(
+#endif    
+    worldPos = uMat4Model * worldPos;
+    oVertexPos = worldPos.xyz;
+    oLightSpacePos = uLightViewProj * worldPos;
+    gl_Position = uMat4Projection * uMat4View * worldPos;
+
+#ifdef USE_NORMAL
+#ifdef USE_INSTANCING
+    toFSVec3Normal = mat3(transpose(inverse(uMat4Model))) * (instanceNormalMatrix * aNormal);
+#else
+    toFSVec3Normal = mat3(transpose(inverse(uMat4Model))) * aNormal;
+#endif
+#endif
+
+#ifdef USE_TANGENT
+#ifdef USE_INSTANCING
+    toFSVec3Tangent = mat3(transpose(inverse(uMat4Model))) * (instanceNormalMatrix * aTangent);
+#else
+    toFSVec3Tangent = mat3(transpose(inverse(uMat4Model))) * aTangent;
+#endif
+#endif
+
+#ifdef USE_BINORMAL
+#ifdef USE_INSTANCING
+    toFSVec3Binormal = mat3(transpose(inverse(uMat4Model))) * (instanceNormalMatrix * aBinormal);
+#else
+    toFSVec3Binormal = mat3(transpose(inverse(uMat4Model))) * aBinormal;
+#endif
+#endif
+
+#ifdef USE_TEXCOORD_0
+    toFSVec2TexCoord0 = aTexCoord0;
+#endif
+#ifdef USE_TEXCOORD_1
+    toFSVec2TexCoord1 = aTexCoord1;
+#endif
+}
+)";
+
+#if defined(DEBUG)
+    //FMLOG(shaderCode.c_str());
+    g_strVSForDebug = shaderCode;
+#endif
+    return shaderCode;
+}
+
+
+//from grok but didnt woks
+//-----------------------------------
+
+std::string GenerateFragmentShaderWithFVF(int64 e_i64FVFFlags, sTectureAndTexCoordinateIndex* e_pTectureAndTexCoordinateIndex)
+{
+    std::string l_strDefine = GenerateFragmentShaderDefines(e_i64FVFFlags, e_pTectureAndTexCoordinateIndex);
+
+    std::string shaderCode;
+#if defined(WIN32)
+    shaderCode += "#version 330 core\n";
+#else
+    shaderCode += R"(#version 300 es
+precision mediump float;
+precision highp int;
+precision highp sampler2D;
+)";
+#endif
+    shaderCode += l_strDefine;
+    shaderCode += g_strSpotAndPointLightFunction;
+    // --- Shadow mapping support ---
+    shaderCode += g_strShadowMapShaderFunction;
+#ifdef DEBUG
+    shaderCode += R"(
+flat in int toFSInstanceID; // Flat qualifier for instance ID
+)";
+#endif
+    shaderCode += R"(
+in vec3 oVertexPos;
+in vec4 oLightSpacePos;
+#ifdef USE_NORMAL
+in vec3 toFSVec3Normal;
+#endif
+#ifdef USE_TEXCOORD_0
+in vec2 toFSVec2TexCoord0;
+#endif
+#ifdef USE_TEXCOORD_1
+in vec2 toFSVec2TexCoord1;
+#endif
+#ifdef USE_TANGENT
+in vec3 toFSVec3Tangent;
+#endif
+#ifdef USE_BINORMAL
+in vec3 toFSVec3Binormal;
+#endif
+
+out vec4 FragColor;
+
+uniform vec3 uVec3ViewPosition;
+
+// Material uniforms
+uniform sampler2D uTextureDiffuse;
+uniform vec4 uBaseColorFactor;
+#ifdef USE_NORMAL_MAP
+uniform sampler2D uTextureNormal;
+#endif
+#ifdef USE_OCCLUSION
+uniform sampler2D uTextureOcclusion;
+uniform float uOcclusionStrength;
+#endif
+#ifdef USE_METALLIC_ROUGHNESS
+uniform sampler2D uTextureMetallicRoughness;
+#endif
+uniform float uMetallicFactor;
+uniform float uRoughnessFactor;
+#ifdef USE_EMISSIVE
+uniform sampler2D uTextureEmissive;
+uniform vec3 uEmissiveFactor;
+#endif
+#ifdef USE_SPECULAR
+uniform sampler2D uTextureSpecular;
+uniform float uSpecularFactor;
+uniform sampler2D uTextureSpecularColor;
+uniform vec3 uSpecularColorFactor;
+#endif
+uniform float uAlphaCutoff;
+uniform samplerCube uTextureEnvironment; // Environment cubemap for skybox/reflection
+
+// IBL (Image-Based Lighting) uniforms
+#ifdef USE_IBL
+uniform samplerCube uDiffuseIrradianceMap;  // Pre-convolved diffuse irradiance
+uniform samplerCube uPrefilteredEnvMap;      // Pre-filtered specular environment map
+uniform sampler2D uBrdfLUT;                  // BRDF Look-Up Table
+uniform float uMaxReflectionLOD;             // Max mip level for prefiltered map
+#endif
+
+// Transmission uniforms
+uniform float uTransmissionFactor;
+uniform sampler2D uTextureTransmission;
+uniform float uIOR;
+uniform float uThicknessFactor;
+uniform float uAttenuationDistance;
+uniform vec3 uAttenuationColor;
+
+// PBR functions
+const float PI = 3.14159265359;
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    return a2 / (PI * denom * denom);
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+    float denom = NdotV * (1.0 - k) + k;
+    return NdotV / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    return ggx1 * ggx2;
+}
+
+vec3 FresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 CalculatePBRLighting(vec3 N, vec3 V, vec3 L, vec3 lightColor, float lightIntensity, vec3 albedo, float roughness, float metallic, float occlusion, vec3 specularColor)
+{
+    vec3 H = normalize(V + L);
+    vec3 F0 = mix(vec3(0.04), albedo, metallic) * specularColor;
+    vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.0);
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * NdotV * NdotL + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    vec3 kd = vec3(1.0) - F;
+    kd *= 1.0 - metallic;
+
+    vec3 diffuse = kd * albedo / PI;
+    vec3 radiance = lightColor * lightIntensity;
+    return (diffuse + specular) * radiance * NdotL * occlusion;
+}
+
+vec3 GetNormalFromMap()
+{
+#if defined(USE_NORMAL_MAP) && defined(USE_TANGENT) && defined(USE_NORMAL) && defined(USE_TEXCOORD_0)
+    vec3 tangent = normalize(toFSVec3Tangent);
+    vec3 normal = normalize(toFSVec3Normal);
+#ifdef USE_BINORMAL
+    vec3 bitangent = normalize(toFSVec3Binormal);
+#else
+    vec3 bitangent = normalize(cross(normal, tangent));
+#endif
+    mat3 TBN = mat3(tangent, bitangent, normal);
+    vec3 normalMap = texture(uTextureNormal, toFSVec2TexCoord0).rgb * 2.0 - 1.0;
+    return normalize(TBN * normalMap);
+#else
+#ifdef USE_NORMAL
+    return normalize(toFSVec3Normal);
+#else
+    return vec3(0.0, 0.0, 1.0); // Default normal if none provided
+#endif
+#endif
+}
+
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+#ifdef USE_IBL
+// Full IBL contribution using split-sum approximation
+vec3 GetIBLContribution(vec3 N, vec3 V, vec3 albedo, float roughness, float metallic, float ao, vec3 specularColor)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    vec3 R = reflect(-V, N);
+    
+    // Calculate F0 (surface reflection at zero incidence)
+    vec3 F0 = mix(vec3(0.04), albedo, metallic) * specularColor;
+    vec3 F = FresnelSchlickRoughness(NdotV, F0, roughness);
+    
+    vec3 kS = F;
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+    
+    // Diffuse IBL - sample irradiance map
+    vec3 irradiance = texture(uDiffuseIrradianceMap, N).rgb;
+    vec3 diffuse = kD * irradiance * albedo;
+    
+    // Specular IBL - sample pre-filtered environment map with roughness-based LOD
+    vec3 prefilteredColor = textureLod(uPrefilteredEnvMap, R, roughness * uMaxReflectionLOD).rgb;
+    vec2 brdf = texture(uBrdfLUT, vec2(NdotV, roughness)).rg;
+    vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+    
+    return (diffuse + specular) * ao;
+}
+#else
+// Fallback: Simple environment reflection without IBL precomputation
+vec3 GetEnvironmentReflection(vec3 N, vec3 V, float roughness, vec3 F0)
+{
+    vec3 R = reflect(-V, N);
+    float lod = roughness * 6.0; // Adjust lod level based on roughness
+    vec3 envColor = textureLod(uTextureEnvironment, R, lod).rgb;
+    vec3 F = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    return envColor * F;
+}
+#endif
+
+
+void main()
+{
+    vec3 vModelNormal = GetNormalFromMap();
+    vec3 vViewPostToVertexPos = normalize(uVec3ViewPosition - oVertexPos);
+    vec3 color = vec3(0.0);
+    float alpha = uBaseColorFactor.a;
+#if defined(USE_TEXCOORD_0) && defined(FVF_BASE_COLOR_TEXTURE_FLAG)
+    vec4 diffuseSample = texture(uTextureDiffuse, toFSVec2TexCoord0);
+    vec3 albedo = pow(diffuseSample.rgb, vec3(2.2)) * uBaseColorFactor.rgb;
+    alpha *= diffuseSample.a; // Incorporate texture alpha for transparency
+#else
+    vec3 albedo = uBaseColorFactor.rgb;
+#endif
+#ifdef ALPHA_MASK
+if (alpha < uAlphaCutoff)
+    discard;
+#endif
+#ifdef USE_OCCLUSION
+    float occlusion = texture(uTextureOcclusion, toFSVec2TexCoord0).r * uOcclusionStrength;
+#else
+    float occlusion = 1.0;
+#endif
+
+#ifdef USE_METALLIC_ROUGHNESS
+    float metallic = texture(uTextureMetallicRoughness, toFSVec2TexCoord0).b * uMetallicFactor;
+    float roughness = texture(uTextureMetallicRoughness, toFSVec2TexCoord0).g * uRoughnessFactor;
+#else
+    float metallic = uMetallicFactor;
+    float roughness = uRoughnessFactor;
+#endif
+
+#ifdef USE_EMISSIVE
+    vec3 emissive = pow(texture(uTextureEmissive, toFSVec2TexCoord0).rgb, vec3(2.0)) * uEmissiveFactor;
+#else
+    vec3 emissive = vec3(0.0);
+#endif
+
+#ifdef USE_SPECULAR
+    float specularFactor = uSpecularFactor;
+    #if defined(USE_TEXCOORD_0)
+    #ifdef HAS_SPECULAR_TEXTURE
+    // Use only the alpha channel for specularFactor
+    specularFactor *= texture(uTextureSpecular, toFSVec2TexCoord0).a;
+    #endif
+    #endif
+    vec3 specularColor = uSpecularColorFactor;
+    #if defined(USE_TEXCOORD_0)
+    #ifdef HAS_SPECULAR_COLOR_TEXTURE
+    // Use only RGB for F0
+    specularColor *= texture(uTextureSpecularColor, toFSVec2TexCoord0).rgb;
+    #endif
+    #endif
+#else
+    float specularFactor = 1.0;
+    vec3 specularColor = vec3(1.0);
+#endif
+
+    for (int i = 0; i < numLights.x; i++)
+    {
+        if(lights[i].xTypeyEnable.y == 0) // If light is not enabled
+        {
+            continue;
+        }
+        int l_iType = lights[i].xTypeyEnable.x;
+        vec3 vLightDirection = vec3(0.0); // Always initialize
+        float attenuation = 1.0;
+        float shadow = 1.0;
+        if (l_iType == 0) // Directional light
+        {
+            vLightDirection = -normalize(lights[i].direction.xyz);
+            if(uEnableShadow)
+                shadow = ShadowCalculationDirectionLight(oLightSpacePos, vModelNormal, -vLightDirection);
+        }
+        else 
+        if (l_iType == 3) // Ambient light
+        {
+            color += lights[i].color.xyz * albedo * occlusion * 0.2;
+            continue;
+        }
+        else
+        if (l_iType == 2) // Spot light
+        {
+            attenuation = GetSpotLightAttenuation(i, oVertexPos, vLightDirection);
+            if(uEnableShadow)
+                shadow = ShadowCalculationSpot(oLightSpacePos);
+        }
+        else // Point
+        {
+            attenuation = GetPointLightAttenuation(i, oVertexPos, vLightDirection);
+            if(uEnableShadow)
+                shadow = ShadowCalculationPoint(i, oVertexPos);
+        }
+        if (attenuation <= 0.0)
+            continue;
+        // Use shadow in lighting calculation
+#ifdef USE_PBR
+        color += CalculatePBRLighting(vModelNormal, vViewPostToVertexPos, vLightDirection, lights[i].color.xyz, lights[i].LightData_xIntensityyRangezInnerConeAngelwOutterConeAngle.x * attenuation, albedo, roughness, metallic, occlusion, specularColor) * specularFactor * shadow;
+#else
+        float diff = max(dot(vModelNormal, vLightDirection), 0.0)*lights[i].LightData_xIntensityyRangezInnerConeAngelwOutterConeAngle.x;
+        color += (diff*albedo) * shadow;
+#endif
+    }
+#ifdef USE_PBR
+    // Environment/IBL Contribution
+    vec3 F0 = mix(vec3(0.04), albedo, metallic) * specularColor;
+#ifdef USE_IBL
+    // Full IBL with diffuse irradiance + specular pre-filtered maps
+    vec3 ambient = GetIBLContribution(vModelNormal, vViewPostToVertexPos, albedo, roughness, metallic, occlusion, specularColor);
+    color += ambient;
+#else
+    // Fallback: Simple environment reflection
+    vec3 reflection = GetEnvironmentReflection(vModelNormal, vViewPostToVertexPos, roughness, F0) * occlusion;
+    color += reflection * 0.5; // Blend with lighting
+    // Add basic ambient term when no IBL
+    color += vec3(0.03) * albedo * occlusion;
+#endif
+#endif
+
+    color += emissive;
+
+    // Transmission logic (simplified, real implementation should use screen-space ray tracing for refraction)
+    float transmission = uTransmissionFactor;
+    #ifdef USE_TEXCOORD_0
+    vec3 transmissionColor = vec3(1.0);
+    transmissionColor *= transmission;
+    transmissionColor *= texture(uTextureTransmission, toFSVec2TexCoord0).r;
+    #endif
+    // Attenuation (volume absorption)
+    float thickness = uThicknessFactor;
+    float attenuationDist = uAttenuationDistance;
+    vec3 attenuationColor = uAttenuationColor;
+    if (thickness > 0.0 && attenuationDist > 0.0)
+    {
+        float att = exp(-thickness / attenuationDist);
+#ifdef USE_TEXCOORD_0
+        transmissionColor *= mix(vec3(1.0), attenuationColor, att);
+#endif
+    }
+    // IOR (index of refraction) can be used for Fresnel blending
+    float ior = uIOR;
+    float eta = 1.0 / ior;
+    float fresnel = pow(1.0 - max(dot(vModelNormal, vViewPostToVertexPos), 0.0), 5.0);
+    // Blend transmission with surface color
+#ifdef USE_TEXCOORD_0
+    color = mix(color, transmissionColor, transmission * (1.0 - fresnel));
+#endif
+
+    // HDR Tone Mapping (Reinhard) - preserves more contrast for 3D appearance
+    // Higher exposure value preserves more detail in reflections
+    color = color / (color + vec3(1.0));  // Reinhard tone mapping
+    
+    // Gamma correction
+    FragColor = vec4(pow(color, vec3(1.0 / 2.2)), alpha);
+    //for normal debug
+    //FragColor = vec4(normalize(toFSVec3Normal) * 0.5 + 0.5, 1.0);
+
+
+)";
+#ifdef DEBUG
+    shaderCode += R"(
+    if(toFSInstanceID %10 == 1)
+    {
+        FragColor.rgb *= vec3(1.0, 1.0, 0.0); // Debug color for every 100th instance   
+    })";
+#endif
+    shaderCode += R"(
+}
+)";
+    // --- Begin fix: select correct texcoord for each texture type ---
+        // Helper lambda to select the correct texcoord string
+    auto GetTexCoordStr = [](int idx)
+        {
+            if (idx == 1)
+                return std::string("toFSVec2TexCoord1");
+            return std::string("toFSVec2TexCoord0");
+        };
+
+    // Default indices if pointer is null
+    int baseColorIdx = 0, normalIdx = 0, occIdx = 0, emissiveIdx = 0, mrIdx = 0, specularIdx = 0, specularColorIdx = 0;
+    if (e_pTectureAndTexCoordinateIndex)
+    {
+        baseColorIdx = e_pTectureAndTexCoordinateIndex->m_iBaseColorTextureCoordinateIndex;
+        normalIdx = e_pTectureAndTexCoordinateIndex->m_iNormalTextureCoordinateIndex;
+        occIdx = e_pTectureAndTexCoordinateIndex->m_iOocclusionTextureCoordinateIndex;
+        emissiveIdx = e_pTectureAndTexCoordinateIndex->m_iEmissiveTextureCoordinateIndex;
+        mrIdx = e_pTectureAndTexCoordinateIndex->m_iMetallicRoughnessTextureCoordinateIndex;
+        specularIdx = e_pTectureAndTexCoordinateIndex->m_iSpecularTextureCoordinateIndex;
+        specularColorIdx = e_pTectureAndTexCoordinateIndex->m_iSpecularColorTextureCoordinateIndex;
+    }
+
+    // Replace texcoord usages in the shader code
+    // For each texture type, replace toFSVec2TexCoord0 with the correct one if needed
+    // Only replace the first occurrence for each texture type
+
+    const char* searchPattern;
+    std::string replacement;
+    size_t pos;
+    
+    // Base Color
+    searchPattern = "texture(uTextureDiffuse, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureDiffuse, " + GetTexCoordStr(baseColorIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // Normal Map
+    searchPattern = "texture(uTextureNormal, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureNormal, " + GetTexCoordStr(normalIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // Occlusion
+    searchPattern = "texture(uTextureOcclusion, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureOcclusion, " + GetTexCoordStr(occIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // MetallicRoughness - handle multiple occurrences correctly
+    searchPattern = "texture(uTextureMetallicRoughness, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    while (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureMetallicRoughness, " + GetTexCoordStr(mrIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+        // Move past the replacement we just made to avoid re-finding it
+        pos += replacement.length();
+        // Search for the next occurrence
+        pos = shaderCode.find(searchPattern, pos);
+    }
+
+    // Emissive
+    searchPattern = "texture(uTextureEmissive, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureEmissive, " + GetTexCoordStr(emissiveIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // Specular
+    searchPattern = "texture(uTextureSpecular, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureSpecular, " + GetTexCoordStr(specularIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // SpecularColor
+    searchPattern = "texture(uTextureSpecularColor, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureSpecularColor, " + GetTexCoordStr(specularColorIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // Clearcoat
+    searchPattern = "texture(uTextureClearcoat, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureClearcoat, " + GetTexCoordStr(baseColorIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // Clearcoat Roughness
+    searchPattern = "texture(uTextureClearcoatRoughness, toFSVec2TexCoord0)";
+    pos = shaderCode.find(searchPattern);
+    if (pos != std::string::npos)
+    {
+        replacement = "texture(uTextureClearcoatRoughness, " + GetTexCoordStr(mrIdx) + ")";
+        shaderCode.replace(pos, strlen(searchPattern), replacement);
+    }
+
+    // --- End fix ---
+#if defined(DEBUG)// || defined(WASM)
+    FMLOG(shaderCode.c_str());
+    g_strFSForDebug = shaderCode;
+#endif
+    return shaderCode;
+}
+
+void DumpShaderCompilerInfo(GLuint e_uiShader)
+{
+    GLint compiled;
+    glGetShaderiv(e_uiShader, GL_COMPILE_STATUS, &compiled);
+    if (compiled != GL_TRUE)
+    {
+        // Get the length of the log
+        GLint logLength = 0;
+        glGetShaderiv(e_uiShader, GL_INFO_LOG_LENGTH, &logLength);
+
+        if (logLength > 0)
+        {
+            std::vector<GLchar> log(logLength);
+            glGetShaderInfoLog(e_uiShader, logLength, nullptr, log.data());
+            printf("Shader compile error:\n%s\n", log.data());
+        }
+        else
+        {
+            printf("Shader compile failed but no log available.\n");
+        }
+    }
+    else
+    {
+        printf("Shader compile ok\n");
+    }
+}
+
+GLuint CreateOpenGLShaderProgram(const std::string& vertexShaderCode, const std::string& fragmentShaderCode)
+{
+    std::string vertexCode = vertexShaderCode;
+    //printf("vertex shader code:\n%s", vertexCode.c_str());
+    std::string fragmentCode = fragmentShaderCode;
+
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    const char* vShaderCode = vertexCode.c_str();
+    glShaderSource(vertexShader, 1, &vShaderCode, nullptr);
+    LAZY_DO_GL_COMMAND_AND_GET_ERROR(glCompileShader(vertexShader));
+    DumpShaderCompilerInfo(vertexShader);
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char* fShaderCode = fragmentCode.c_str();
+    glShaderSource(fragmentShader, 1, &fShaderCode, nullptr);
+    LAZY_DO_GL_COMMAND_AND_GET_ERROR(glCompileShader(fragmentShader));
+    DumpShaderCompilerInfo(fragmentShader);
+
+    GLuint shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+    GLint success;
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        GLchar infoLog[512];
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        FMLOG(infoLog);
+        assert(0 && "shader compile error");
+    }
+    else
+    {
+#ifdef DEBUG
+        if (0)
+        {
+            PopulateUniform(shaderProgram);
+            PopulateAttribute(shaderProgram);
+        }
+#endif
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    return shaderProgram;
+}
+
+void PopulateUniform(int e_iProgram)
+{
+    int count = -1;
+    int length;
+    char name[128];
+    int size;
+    GLenum type;
+    std::map<std::string, unsigned int>  l_NameAndAttributeLocationMap;
+    glUseProgram(e_iProgram);
+    glGetProgramiv(e_iProgram, GL_ACTIVE_ATTRIBUTES, &count);
+    FMLOG("vertex attribute count %d", count);
+    for (int i = 0; i < count; ++i)
+    {
+        memset(name, 0, sizeof(char) * 128);
+        glGetActiveAttrib(e_iProgram, (GLuint)i, 128, &length, &size, &type, name);
+        int attrib = glGetAttribLocation(e_iProgram, name);
+        if (attrib >= 0)
+        {
+            l_NameAndAttributeLocationMap[name] = attrib;
+            FMLOG("%s,%d", name, attrib);
+        }
+    }
+}
+
+void PopulateAttribute(int e_iProgram)
+{
+    int count = -1;
+    int length;
+    char name[128];
+    int size;
+    GLenum type;
+    std::map<std::string, unsigned int>  l_NameAndAttributeLocationMap;
+    glUseProgram(e_iProgram);
+    glGetProgramiv(e_iProgram, GL_ACTIVE_ATTRIBUTES, &count);
+    FMLOG("vertex attribute count %d", count);
+    for (int i = 0; i < count; ++i)
+    {
+        memset(name, 0, sizeof(char) * 128);
+        glGetActiveAttrib(e_iProgram, (GLuint)i, 128, &length, &size, &type, name);
+        int attrib = glGetAttribLocation(e_iProgram, name);
+        if (attrib >= 0)
+        {
+            l_NameAndAttributeLocationMap[name] = attrib;
+            FMLOG("%s,%d", name, attrib);
+        }
+    }
+}
