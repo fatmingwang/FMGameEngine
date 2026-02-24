@@ -267,6 +267,7 @@
     <ClCompile Include="..\EngineTest\Sample.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\AllLibInclude.h" />
     <ClInclude Include="..\EngineTest\ComputerShader.h" />
     <ClInclude Include="..\EngineTest\ComputerShaderUniform.h" />
     <ClInclude Include="..\EngineTest\JPEGCodingTest.h" />

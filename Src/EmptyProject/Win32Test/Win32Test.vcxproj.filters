@@ -113,6 +113,9 @@
     <ClInclude Include="..\EngineTest\MyImGui.h">
       <Filter>Game\ImGui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\AllLibInclude.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="small.ico">
