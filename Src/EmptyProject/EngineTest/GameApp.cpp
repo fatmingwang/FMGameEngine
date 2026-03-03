@@ -1,23 +1,12 @@
 #include "stdafx.h"
 #include "GameApp.h"
 //#include "TestPhase.h"
-#include "NetworkSample.h"
 #include "../../imgui/ImGuiRender.h"
 #include "../../imgui/imgui.h"
 #include "MyImGui.h"
 #ifdef WASM
 #include <emscripten/html5.h>						
 #endif			   
-cNetworkSample* g_pNetworkSample = nullptr;	 
-
-extern void	LoadSample();						
-extern void	DestorySampleObject();
-extern void	SampleUpdate(float e_fElpaseTime);
-extern void	SampleRender();
-extern void	SampleMouseDown(int e_iPosX,int e_iPosY);
-extern void	SampleMouseMove(int e_iPosX,int e_iPosY);
-extern void	SampleMouseUp(int e_iPosX,int e_iPosY);
-extern void	SampleKeyup(char e_cKey);
 
 extern int		glTFInit();
 extern void		GlTFUpdate(float e_fElpaseTime);
@@ -32,10 +21,6 @@ cEngineTestApp::cEngineTestApp(HWND e_Hwnd,Vector2 e_vGameResolution,Vector2 e_v
 cEngineTestApp::cEngineTestApp(Vector2 e_vGameResolution,Vector2 e_vViewportSize):cGameApp(e_vGameResolution,e_vViewportSize)
 #endif
 {
-#ifdef WASM
-	//FMLOG("new cNetworkSample");
-	//g_pNetworkSample = new cNetworkSample();
-#endif
 	this->m_sbDebugFunctionWorking = true;
 	this->m_sbSpeedControl = true;
 	m_bLeave = false;
@@ -50,18 +35,12 @@ cEngineTestApp::~cEngineTestApp()
 	GlTFDestory();
 	//cMyImGuiTesting::Destory();
 	SAFE_DELETE(m_pPhaseManager);
-	SAFE_DELETE(g_pNetworkSample);
-	DestorySampleObject();
 	Destroy();
 }
 
 void	cEngineTestApp::Init()
 {
 	cGameApp::Init();
-	if (g_pNetworkSample)
-	{
-		g_pNetworkSample->Init();
-	}
 	//cMyImGuiTesting::Init();
 	glTFInit();
 	//LoadSample();
@@ -82,10 +61,6 @@ void	cEngineTestApp::Update(float e_fElpaseTime)
     cGameApp::Update(e_fElpaseTime);
 	//SampleUpdate(e_fElpaseTime);
 	this->m_pPhaseManager->Update(e_fElpaseTime);
-	if (g_pNetworkSample)
-	{
-		g_pNetworkSample->Update(e_fElpaseTime);
-	}
 	GlTFUpdate(e_fElpaseTime);
 }
 
@@ -111,14 +86,12 @@ void	cEngineTestApp::MouseDown(int e_iPosX,int e_iPosY)
 {
     cGameApp::MouseDown(e_iPosX,e_iPosY);
 	this->m_pPhaseManager->MouseDown(cGameApp::m_sMousePosition.x,cGameApp::m_sMousePosition.y);
-	SampleMouseDown(m_sMousePosition.x, m_sMousePosition.y);
 }
 
 void	cEngineTestApp::MouseMove(int e_iPosX,int e_iPosY)
 {
     cGameApp::MouseMove(e_iPosX,e_iPosY);
 	this->m_pPhaseManager->MouseMove(cGameApp::m_sMousePosition.x,cGameApp::m_sMousePosition.y);
-	SampleMouseMove(m_sMousePosition.x, m_sMousePosition.y);
 }
 
 void	cEngineTestApp::MouseUp(int e_iPosX,int e_iPosY)
@@ -126,7 +99,6 @@ void	cEngineTestApp::MouseUp(int e_iPosX,int e_iPosY)
 	//FMLOG("send data");
     cGameApp::MouseUp(e_iPosX,e_iPosY);
 	this->m_pPhaseManager->MouseUp(cGameApp::m_sMousePosition.x,cGameApp::m_sMousePosition.y);
-	SampleMouseUp(m_sMousePosition.x, m_sMousePosition.y);
 	//if (g_pNetworkSample && g_pNetworkSample->GetNetWorkStatus() == eNetWorkStatus::eNWS_CONNECTED)
 	//{
 	//	tutorial::Person l_Person;
@@ -158,5 +130,4 @@ void	cEngineTestApp::KeyDown(char e_char)
 void	cEngineTestApp::KeyUp(char e_char)
 {
 	cGameApp::KeyUp(e_char);
-	SampleKeyup(e_char);
 }

@@ -375,9 +375,6 @@ void	DestorySampleObject()
 
 void	SampleUpdate(float e_fElpaseTime)
 {
-#if defined(WIN32)
-	WebSocketUpdate(e_fElpaseTime);
-#endif
 
 
 #ifdef WASM
